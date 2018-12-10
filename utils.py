@@ -4,8 +4,11 @@
 #3. read the SASE fields.
 import scipy.io as sio
 import numpy as np
-import h5py
+#import h5py
 import sciconst 
+import sys
+import subprocess
+from itertools import permutations
 def readin(f2o):
     f = open(f2o)
     alllines=f.readlines()
@@ -91,7 +94,7 @@ def seed_gen(seed, f2w):
     f.close()
 def miller(a ,phE):
     #in unit of A 3.567
-    lambdas = 12.4/phE
+    lambdas = 12.4e3/phE
     nmax = int(np.floor(2*a/lambdas))
     n = range(0,nmax+1)
     m = range(0,nmax+1)
@@ -109,4 +112,96 @@ def miller(a ,phE):
     #print(cots)
     fmiller = cots.argmin()
     return millers[fmiller], np.rad2deg(thetas[fmiller])
+def susceptdb(phE, millerInd, db):
+    #millerInd is a list [1,1,1]
+    tmp = subprocess.getoutput('ls '+db)
+    files = tmp.split('\n')
+    for p in permutations(millerInd):
+        fname = str(phE)+'eV_'+str(p[0])+'-'+str(p[1])+'-'+str(p[2])
+        if fname in files:
+            return p
+    print('Please insert new data to the DB') 
+    
+def ReadGenesis2(fto):
+    prm1='    z'
+    ftc=open(fto,'r')
+    alllines=ftc.readlines()
+    ftc.close()
+    n=-1
+    data=[]
+    dct={}
+    for line in alllines:
+        n += 1
+        if 'zsep' in line:
+            tmp = line.split('=')[-1]
+            tmp1 = tmp.replace('D','E')
+            zsep = float(tmp1)            # Read zsep
+        if 'xlamds' in line:
+            tmp = line.split('=')[-1]
+            tmp1 = tmp.replace('D','E')
+            xlamds = float(tmp1)        # Read xlamds
+        if prm1 in line:
+            nn=n
+        if 'output: slice' in line:
+            break
+
+    dct['xlamds']=xlamds
+    dct['zsep']=zsep
+    data=alllines[nn+1:n-1]
+    m=len(data)
+    data=''.join(data)
+    data=data.split()
+#    data=map(eval,data)
+    data=np.array(data)
+    data=data.reshape(m,3)
+    del alllines[0:n-1]
+    title=alllines[6]
+    stitle=title.split()
+    p=len(stitle)
+    nslice=len(alllines)/(m+7)
+    dct['nslice']=nslice
+    I = []
+    for i in range(0,nslice):
+        tmp =alllines[m*i+3].split()
+        I.append(float(tmp[0]))
+        del alllines[m*i:m*i+7]
+    I = np.array(I)
+    dct['current'] = I
+    data1=''.join(alllines)
+    del alllines
+    data1=data1.split()
+  # data1=map(eval,data1)
+    data1=np.array(data1)
+    if len(data1)!=m*nslice*p:
+        print(len(data1),m,nslice,p)
+        print('total data numer != nslice*column*row')
+        sys.exit()
+    data1=data1.reshape(m*nslice,p)
+    dct['z']=data[:,0]
+    dct['aw']=data[:,1]
+    dct['qf']=data[:,2]
+    for ii in range(0,len(stitle)):
+        dct[stitle[ii]]=data1[:,ii].reshape(nslice,m)
+    return dct
+
+    
+    
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
